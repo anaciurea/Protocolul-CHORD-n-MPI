@@ -1,72 +1,72 @@
-# Protocolul CHORD în MPI
+# CHORD Protocol in MPI
 
-**Tema 2 – Algoritmi Paraleli și Distribuiți (APD)**
+**Assignment 2 – Parallel and Distributed Algorithms (APD)**
 Ciurea Ana Sorina – 331CC
 
-Simulare a protocolului **CHORD** (Distributed Hash Table) folosind **MPI**. Fiecare proces MPI reprezintă un nod din inelul CHORD și comunică cu celelalte noduri pentru a rezolva cereri de lookup. Inelul este static, dar rutarea respectă complexitatea **O(log N)** prin folosirea *finger table*-urilor.
+Simulation of the **CHORD** protocol (Distributed Hash Table) using **MPI**. Each MPI process represents a node in the CHORD ring and communicates with the other nodes to resolve lookup requests. The ring is static, but routing achieves **O(log N)** complexity by using *finger tables*.
 
-## Structura proiectului
+## Project structure
 
-| Fișier | Descriere |
+| File | Description |
 |--------|-----------|
-| `tema2.c` | Implementarea protocolului CHORD |
-| `Makefile` | Compilare cu `mpicc` |
-| `README.pdf` | Documentația originală a temei |
+| `tema2.c` | CHORD protocol implementation |
+| `Makefile` | Build with `mpicc` |
+| `README.pdf` | Original assignment documentation |
 
-## Compilare și rulare
+## Build and run
 
 ```bash
-make            # generează executabilul tema2
+make            # builds the tema2 executable
 mpirun -np <N> ./tema2
 make clean
 ```
 
-Fiecare rank `r` citește fișierul `in<r>.txt` cu formatul:
+Each rank `r` reads the file `in<r>.txt` with the following format:
 
 ```
-<ID CHORD al nodului>
-<numărul de lookup-uri>
-<cheie_1> <cheie_2> ... <cheie_k>
+<CHORD ID of the node>
+<number of lookups>
+<key_1> <key_2> ... <key_k>
 ```
 
-Spațiul de ID-uri are `2^M = 16` poziții (`M = 4`).
+The ID space has `2^M = 16` positions (`M = 4`).
 
-Pentru fiecare lookup, inițiatorul afișează traseul parcurs:
+For each lookup, the initiator prints the path taken:
 
 ```
-Lookup <key>: <id_1> -> <id_2> -> ... -> <responsabil>
+Lookup <key>: <id_1> -> <id_2> -> ... -> <responsible_node>
 ```
 
-## Arhitectură și implementare
+## Architecture and implementation
 
-### 1. Construirea finger table (`build_finger_table`)
-Tabela este construită o singură dată, la inițializare:
-- pentru fiecare intrare `i` (de la `0` la `M-1`): `start = (id + 2^i) % RING_SIZE`;
-- succesorul lui `start` se caută în lista sortată a nodurilor existente (`sorted_ids`) cu `find_successor_simple`, care întoarce primul nod cu `ID >= start` (sau primul nod din inel, la wrap-around).
+### 1. Building the finger table (`build_finger_table`)
+The table is built only once, at initialization:
+- for each entry `i` (from `0` to `M-1`): `start = (id + 2^i) % RING_SIZE`;
+- the successor of `start` is searched in the sorted list of existing nodes (`sorted_ids`) using `find_successor_simple`, which returns the first node with `ID >= start` (or the first node in the ring, on wrap-around).
 
-### 2. Rutare eficientă (`closest_preceding_finger`)
-- se parcurge finger table-ul de la `M-1` la `0`;
-- se returnează primul `finger[i].node` aflat în intervalul circular `(self.id, key)`;
-- dacă nu există un astfel de finger, se întoarce succesorul direct (`self.successor`).
+### 2. Efficient routing (`closest_preceding_finger`)
+- the finger table is traversed from `M-1` down to `0`;
+- the first `finger[i].node` located in the circular interval `(self.id, key)` is returned;
+- if no such finger exists, the direct successor (`self.successor`) is returned.
 
-### 3. Gestionarea cererilor (`handle_lookup_request`)
-Procesează mesajele `TAG_LOOKUP_REQ`:
-1. adaugă ID-ul nodului curent în traseul mesajului;
-2. dacă `key ∈ (self.id, self.successor]`, succesorul este responsabil → este adăugat în traseu și se trimite `TAG_LOOKUP_REP` către inițiator;
-3. altfel, cererea este trimisă mai departe (`TAG_LOOKUP_REQ`) către nodul ales de `closest_preceding_finger`.
+### 3. Request handling (`handle_lookup_request`)
+Processes `TAG_LOOKUP_REQ` messages:
+1. adds the current node's ID to the message path;
+2. if `key ∈ (self.id, self.successor]`, the successor is responsible → it is added to the path and a `TAG_LOOKUP_REP` is sent to the initiator;
+3. otherwise, the request is forwarded (`TAG_LOOKUP_REQ`) to the node chosen by `closest_preceding_finger`.
 
-### 4. Protocolul de terminare
-- fiecare nod își inițiază lookup-urile trimițând `TAG_LOOKUP_REQ` către propriul rank;
-- în bucla de servire, nodul contorizează răspunsurile `TAG_LOOKUP_REP` primite;
-- când și-a terminat toate cererile locale, trimite `TAG_DONE` tuturor celorlalte noduri;
-- nodul se oprește doar după ce și-a terminat cererile **și** a primit `TAG_DONE` de la toți ceilalți participanți.
+### 4. Termination protocol
+- each node initiates its lookups by sending `TAG_LOOKUP_REQ` to its own rank;
+- in the serving loop, the node counts the received `TAG_LOOKUP_REP` replies;
+- once all its local requests are completed, it sends `TAG_DONE` to all other nodes;
+- a node stops only after it has completed its own requests **and** has received `TAG_DONE` from all other participants.
 
-Comunicarea se face exclusiv cu `MPI_Send` / `MPI_Recv` și tag-urile `TAG_LOOKUP_REQ`, `TAG_LOOKUP_REP`, `TAG_DONE`.
+Communication is done exclusively with `MPI_Send` / `MPI_Recv` and the tags `TAG_LOOKUP_REQ`, `TAG_LOOKUP_REP`, `TAG_DONE`.
 
-## Punctaj
+## Grading
 
-| Criteriu | Punctaj |
+| Criterion | Score |
 |----------|---------|
-| Corectitudine | 40/40 |
-| Eficiență | 40/40 |
+| Correctness | 40/40 |
+| Efficiency | 40/40 |
 | **Total** | **80/80** |
